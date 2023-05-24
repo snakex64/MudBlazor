@@ -1,4 +1,5 @@
-﻿using System.Linq;
+﻿using System.ComponentModel.Design;
+using System.Linq;
 using Microsoft.AspNetCore.Components;
 using MudBlazor.Docs.Extensions;
 using MudBlazor.Docs.Models;
@@ -8,7 +9,7 @@ namespace MudBlazor.Docs.Shared
 {
     public partial class NavMenu
     {
-        [Inject] IMenuService MenuService { get; set; } 
+        [Inject] IMenuService MenuService { get; set; }
         [Inject] NavigationManager NavMan { get; set; }
 
         //sections are "getting-started","components", "api", ...
@@ -26,11 +27,11 @@ namespace MudBlazor.Docs.Shared
         public void Refresh()
         {
             _section = NavMan.GetSection();
-            _componentLink = NavMan.GetComponentLink();
+            _componentLink = NavMan.GetComponentLink(false);
             StateHasChanged();
         }
 
-        bool IsSubGroupExpanded(MudComponent item)
+        bool IsSubGroupExpanded(params MudComponent[] items)
         {
             #region comment about is subgroup expanded
             //if the route contains any of the links of the subgroup, then the subgroup
@@ -42,7 +43,39 @@ namespace MudBlazor.Docs.Shared
             //radio, select...
             //this route `/components/autocomplete` should open the subgroup "form inputs..."
             #endregion
-            return item.GroupComponents.Any(i => i.Link == _componentLink);
+
+            var prefix = string.Join('/', items.Select(x => x.Link).Where(x => x != null));
+            foreach (var group in items.Last().GroupComponents)
+            {
+                if (group.IsNavGroup)
+                {
+                    foreach (var subGroup in group.GroupComponents)
+                    {
+                        if (subGroup.IsNavGroup)
+                        {
+                            foreach (var subGroupPage in subGroup.GroupComponents)
+                            {
+                                var link = new[] { prefix, group.Link, subGroup.Link, subGroupPage.Link };
+                                if (string.Join('/', link.Where(x => !string.IsNullOrEmpty(x))) == _componentLink)
+                                    return true;
+                            }
+                        }
+                        else
+                        {
+                            var link = new[] { prefix, group.Link, subGroup.Link };
+                            if (string.Join('/', link.Where(x => !string.IsNullOrEmpty(x))) == _componentLink)
+                                return true;
+                        }
+                    }
+                }
+                else
+                {
+                    var link = new[] { prefix, group.Link };
+                    if (string.Join('/', link.Where(x => !string.IsNullOrEmpty(x))) == _componentLink)
+                        return true;
+                }
+            }
+            return false;
         }
     }
 }
